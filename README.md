@@ -4,7 +4,14 @@
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
 </a>
 
-A short description of the project.
+## 🛠 Installation (via uv)
+This project uses `uv` for blazing fast dependency management.
+
+```bash
+uv sync
+
+uv run jupyter notebook notebooks/01_disaster_tweets_eda.ipynb.ipynb
+```
 
 ## Project Organization
 
