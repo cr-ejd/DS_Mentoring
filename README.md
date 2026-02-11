@@ -10,7 +10,7 @@ This project uses `uv` for blazing fast dependency management.
 ```bash
 uv sync
 
-uv run jupyter notebook notebooks/01_disaster_tweets_eda.ipynb.ipynb
+uv run jupyter notebook notebooks/01_disaster_tweets_eda.ipynb
 ```
 
 ## Project Organization
@@ -34,17 +34,12 @@ uv run jupyter notebook notebooks/01_disaster_tweets_eda.ipynb.ipynb
 │                         `1.0-jqp-initial-data-exploration`.
 │
 ├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         disaster_tweets and configuration for tools like black
+│                         disaster_tweets and configuration for tools (ruff, pytest)
 │
 ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
 │
 ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
 │   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.cfg          <- Configuration file for flake8
 │
 └── disaster_tweets   <- Source code for use in this project.
     │
@@ -57,12 +52,8 @@ uv run jupyter notebook notebooks/01_disaster_tweets_eda.ipynb.ipynb
     ├── features.py             <- Code to create features for modeling
     │
     ├── modeling                
-    │   ├── __init__.py 
-    │   ├── predict.py          <- Code to run model inference with trained models          
-    │   └── train.py            <- Code to train models
+    │   eda.py                  <- Exploratory data analysis utilities
     │
-    └── plots.py                <- Code to create visualizations
-```
-
---------
-
+    ├── preprocessing.py        <- Text preprocessing and feature engineering
+    │
+    └── utils.py                <- Utility functions for the projecttraining noise.
