@@ -8,6 +8,11 @@ from typing import Dict, Literal, Optional, Union
 
 import pandas as pd
 
+# pre-compile regexes, added for reusability
+URL_PATTERN = re.compile(r"http\S+|www\S+|https\S+", flags=re.MULTILINE)
+MENTION_PATTERN = re.compile(r"@\w+")
+HASHTAG_PATTERN = re.compile(r"#\w+")
+PUNCT_PATTERN = re.compile(r"[^\w\s]")
 
 def extract_url_features(text: Optional[str]) -> Dict[Literal["url_count", "top_domain", "has_url"], Union[int, Optional[str], bool]]:
     """
@@ -113,15 +118,17 @@ def full_preprocess(text: Optional[str]) -> str:
         Cleaned and normalized text suitable for
         TF-IDF, n-grams, or other vectorizers.
     """
+
     if not text:
         return ""
 
-    text = re.sub(r"http\S+|www\S+|https\S+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"@\w+", "", text)
-    text = re.sub(r"#\w+", "", text)
-    text = re.sub(r"[^\w\s]", "", text)
+    text = URL_PATTERN.sub("", text)
+    text = MENTION_PATTERN.sub("", text)
+    text = HASHTAG_PATTERN.sub("", text)
+    text = PUNCT_PATTERN.sub("", text)
+
     text = text.lower().strip()
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s+", " ", text)  # этот можно оставить как есть, он простой
 
     replacements = {
         "fires": "fire",
