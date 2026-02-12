@@ -21,11 +21,13 @@ dependencies = [
     "numpy>=2.4.2",
     "pandas>=3.0.0",
     "pip",
+    "pyspellchecker>=0.8.4",
     "pytest",
     "python-dotenv",
     "ruff",
     "scikit-learn>=1.8.0",
     "seaborn>=0.13.2",
+    "spacy>=3.8.11",
 ]
 requires-python = "~=3.11.0"
 
