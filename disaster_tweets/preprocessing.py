@@ -4,12 +4,37 @@ Text preprocessing and feature engineering utilities
 
 import re
 from collections import Counter
-from typing import Any, Dict, Optional
+from typing import Dict, Literal, Optional, Union
 
 import pandas as pd
+from spellchecker import SpellChecker
 
+import spacy
+nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])  
 
-def extract_url_features(text: Optional[str]) -> Dict[str, Any]:
+# pre-compile regexes, added for reusability
+URL_PATTERN = re.compile(r"http\S+|www\S+|https\S+", flags=re.MULTILINE)
+MENTION_PATTERN = re.compile(r"@\w+")
+HASHTAG_PATTERN = re.compile(r"#\w+")
+PUNCT_PATTERN = re.compile(r"[^\w\s]")
+
+spell = SpellChecker(language='en')  
+
+def correct_spelling(text: str) -> str:
+    """Fixes typos based on a dictionary."""
+    if not text:
+        return text
+    words = text.split()
+    corrected = []
+    for word in words:
+        if spell.unknown([word]):
+            suggestion = spell.correction(word)
+            corrected.append(suggestion if suggestion else word)
+        else:
+            corrected.append(word)
+    return ' '.join(corrected)
+
+def extract_url_features(text: Optional[str]) -> Dict[Literal["url_count", "top_domain", "has_url"], Union[int, Optional[str], bool]]:
     """
     Extract URL-related features from a text string.
 
@@ -93,14 +118,11 @@ def full_preprocess(text: Optional[str]) -> str:
     Perform full text preprocessing for future modeling.
 
     Steps:
-    - Remove URLs
-    - Remove mentions
-    - Remove hashtags
-    - Remove punctuation
+    - Remove URLs, mentions, hashtags, punctuation
     - Lowercase
-    - Normalize selected disaster-related word forms
-    - Remove basic English stopwords
     - Normalize whitespace
+    - Spell correction (fix typos)
+    - Lemmatization + stop-word removal via spaCy
 
     Parameters
     ----------
@@ -110,62 +132,25 @@ def full_preprocess(text: Optional[str]) -> str:
     Returns
     -------
     str
-        Cleaned and normalized text suitable for
-        TF-IDF, n-grams, or other vectorizers.
+        Cleaned, corrected, lemmatized and stop-word filtered text.
     """
     if not text:
         return ""
 
-    text = re.sub(r"http\S+|www\S+|https\S+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"@\w+", "", text)
-    text = re.sub(r"#\w+", "", text)
-    text = re.sub(r"[^\w\s]", "", text)
+    text = URL_PATTERN.sub("", text)
+    text = MENTION_PATTERN.sub("", text)
+    text = HASHTAG_PATTERN.sub("", text)
+    text = PUNCT_PATTERN.sub("", text)
+
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
 
-    replacements = {
-        "fires": "fire",
-        "flooded": "flood",
-        "earthquakes": "earthquake",
-        "hurricanes": "hurricane",
-        "injured": "injury",
-    }
+    text = correct_spelling(text)
 
-    for wrong, correct in replacements.items():
-        text = text.replace(wrong, correct)
+    doc = nlp(text)
+    lemmatized = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]
 
-    stop_words = {
-        "a",
-        "an",
-        "and",
-        "are",
-        "as",
-        "at",
-        "be",
-        "by",
-        "for",
-        "from",
-        "has",
-        "he",
-        "in",
-        "is",
-        "it",
-        "its",
-        "of",
-        "on",
-        "that",
-        "the",
-        "to",
-        "was",
-        "were",
-        "will",
-        "with",
-    }
-
-    text = " ".join(w for w in text.split() if w not in stop_words)
-
-    return text.strip()
-
+    return " ".join(lemmatized)
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """
