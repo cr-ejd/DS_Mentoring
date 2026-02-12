@@ -26,7 +26,6 @@ dependencies = [
     "ruff",
     "scikit-learn>=1.8.0",
     "seaborn>=0.13.2",
-    "ydata-profiling==4.6.5",
 ]
 requires-python = "~=3.11.0"
 

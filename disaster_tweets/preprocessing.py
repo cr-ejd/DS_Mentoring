@@ -4,12 +4,12 @@ Text preprocessing and feature engineering utilities
 
 import re
 from collections import Counter
-from typing import Any, Dict, Optional
+from typing import Dict, Literal, Optional, Union
 
 import pandas as pd
 
 
-def extract_url_features(text: Optional[str]) -> Dict[str, Any]:
+def extract_url_features(text: Optional[str]) -> Dict[Literal["url_count", "top_domain", "has_url"], Union[int, Optional[str], bool]]:
     """
     Extract URL-related features from a text string.
 
