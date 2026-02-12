@@ -4,14 +4,20 @@
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
 </a>
 
-## 🛠 Installation (via uv)
-This project uses `uv` for blazing fast dependency management.
+## Setup
+This project uses `uv` for dependency management.
 
-```bash
+# Create virtual environment (creates .venv/ in project root)
+uv venv
+
+# Activate it
+# Windows (PowerShell):
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
+
+# Install all dependencies from pyproject.toml + lock exact versions from uv.lock
 uv sync
-
-uv run jupyter notebook notebooks/01_disaster_tweets_eda.ipynb
-```
 
 ## Project Organization
 
