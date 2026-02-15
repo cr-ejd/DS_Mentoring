@@ -7,10 +7,10 @@ from collections import Counter
 from typing import Dict, Literal, Optional, Union
 
 import pandas as pd
+import spacy
 from spellchecker import SpellChecker
 
-import spacy
-nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])  
+nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
 
 # pre-compile regexes, added for reusability
 URL_PATTERN = re.compile(r"http\S+|www\S+|https\S+", flags=re.MULTILINE)
@@ -18,23 +18,33 @@ MENTION_PATTERN = re.compile(r"@\w+")
 HASHTAG_PATTERN = re.compile(r"#\w+")
 PUNCT_PATTERN = re.compile(r"[^\w\s]")
 
-spell = SpellChecker(language='en')  
+spell = SpellChecker(language="en")
+
 
 def correct_spelling(text: str) -> str:
     """Fixes typos based on a dictionary."""
     if not text:
         return text
+    
     words = text.split()
     corrected = []
+    
     for word in words:
         if spell.unknown([word]):
-            suggestion = spell.correction(word)
-            corrected.append(suggestion if suggestion else word)
+            suggestions = spell.correction([word])  # type: ignore 
+            if suggestions and suggestions[0] is not None:
+                corrected.append(suggestions[0])
+            else:
+                corrected.append(word)
         else:
             corrected.append(word)
+    
     return ' '.join(corrected)
 
-def extract_url_features(text: Optional[str]) -> Dict[Literal["url_count", "top_domain", "has_url"], Union[int, Optional[str], bool]]:
+
+def extract_url_features(
+    text: Optional[str],
+) -> Dict[Literal["url_count", "top_domain", "has_url"], Union[int, Optional[str], bool]]:
     """
     Extract URL-related features from a text string.
 
@@ -114,26 +124,6 @@ def count_typos(text: Optional[str]) -> int:
 
 
 def full_preprocess(text: Optional[str]) -> str:
-    """
-    Perform full text preprocessing for future modeling.
-
-    Steps:
-    - Remove URLs, mentions, hashtags, punctuation
-    - Lowercase
-    - Normalize whitespace
-    - Spell correction (fix typos)
-    - Lemmatization + stop-word removal via spaCy
-
-    Parameters
-    ----------
-    text : Optional[str]
-        Raw tweet text.
-
-    Returns
-    -------
-    str
-        Cleaned, corrected, lemmatized and stop-word filtered text.
-    """
     if not text:
         return ""
 
@@ -142,15 +132,37 @@ def full_preprocess(text: Optional[str]) -> str:
     text = HASHTAG_PATTERN.sub("", text)
     text = PUNCT_PATTERN.sub("", text)
 
+    # for cleaning html entities (for n-gram analysis)
+    text = re.sub(r"&[a-zA-Z0-9#]+;", "", text)
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+
+    #how to clean all html tags?
+
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
 
     text = correct_spelling(text)
 
+    replacements = {      #doesn't work well on new data
+        "fires": "fire",
+        "flooded": "flood",
+        "earthquakes": "earthquake",
+        "hurricanes": "hurricane",
+        "injured": "injury",
+        "usa": "united states",  # look for more country name issues / weird stuff
+        "us": "united states",
+        "u.s.": "united states",
+        "unitedstates": "united states",
+        "amp": "",
+    }
+
+    for wrong, correct in replacements.items():
+        text = text.replace(wrong, correct)
+
     doc = nlp(text)
     lemmatized = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]
-
     return " ".join(lemmatized)
+
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """
