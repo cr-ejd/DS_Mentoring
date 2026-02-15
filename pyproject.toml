@@ -15,21 +15,20 @@ classifiers = [
     "Programming Language :: Python :: 3",
     
 ]
-dependencies = [    #remove locked versions???
-    "jupyter>=1.1.1",
-    "matplotlib>=3.10.8",
-    "numpy>=2.4.2",
-    "pandas>=3.0.0",
-    "pip",
-    "pycountry>=24.6.1",
-    "pyspellchecker>=0.8.4",
+dependencies = [
+    "jupyter",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pycountry",
+    "pyspellchecker",
     "pytest",
     "python-dotenv",
-    "rapidfuzz>=3.14.3",
+    "rapidfuzz",
     "ruff",
-    "scikit-learn>=1.8.0",
-    "seaborn>=0.13.2",
-    "spacy>=3.8.11",
+    "scikit-learn",
+    "seaborn",
+    "spacy",
 ]
 requires-python = "~=3.11.0"
 
