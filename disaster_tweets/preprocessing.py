@@ -6,7 +6,7 @@ import html
 import re
 import urllib.parse
 from collections import Counter
-from typing import Dict, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import pandas as pd
 import pycountry
@@ -60,52 +60,111 @@ def correct_spelling(text: str) -> str:
 def normalize_locations(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize location strings to ISO alpha-3 country codes where possible.
 
-    Uses exact matching for country codes/names and fuzzy matching as fallback.
-    Returns cleaned original string if no match is found.
+    Improved version:
+    - Prioritizes exact 2/3-letter country codes
+    - Higher fuzzy thresholds, especially for short strings
+    - partial matching only for very short strings and very high score
+    - Checks parts strictly from the end (country is usually last)
+    - Minimal aliases only for most common abbreviations
+    - Falls back to cleaned original string if no reliable country match
 
-    Args:
-        df (pd.DataFrame): DataFrame containing 'location' column.
-
-    Returns:
-        pd.DataFrame: DataFrame with added 'location_normalized' column.
+    Returns alpha-3 code (lowercase) or cleaned original location.
     """
     df = df.copy()
     df["location"] = df["location"].fillna("").astype(str).str.lower().str.strip()
 
+    country_names = []
+    country_map: Dict[str, str] = {}
+    for c in pycountry.countries:
+        code = c.alpha_3.lower()  # type: ignore
+        if hasattr(c, "name"):
+            n = c.name.lower()  # type: ignore
+            country_names.append(n)
+            country_map[n] = code
+        if hasattr(c, "official_name") and c.official_name:  # type: ignore
+            o = c.official_name.lower()  # type: ignore
+            if o not in country_map:
+                country_names.append(o)
+                country_map[o] = code
+
+    minimal_aliases = {
+        "uk": "gbr",
+        "gb": "gbr",
+        "us": "usa",
+        "u.s.": "usa",
+        "u.k.": "gbr",
+    }
+    for alias, code in minimal_aliases.items():
+        if alias not in country_map:
+            country_names.append(alias)
+            country_map[alias] = code
+
     def _clean_location_string(loc: str) -> str:
-        loc = re.sub(r"[^\w\s]", "", loc)
+        loc = re.sub(r"[^ \w,./-]", "", loc)
         loc = re.sub(r"\s+", " ", loc).strip()
         return loc
+
+    def get_country_code(s: str) -> Optional[str]:
+        s = s.strip()
+        if not s:
+            return None
+
+        if len(s) == 2:
+            country = pycountry.countries.get(alpha_2=s.upper())
+            if country:
+                return country.alpha_3.lower()
+
+        if len(s) == 3:
+            country = pycountry.countries.get(alpha_3=s.upper())
+            if country:
+                return country.alpha_3.lower()
+
+        if s in country_map:
+            return country_map[s]
+
+        match = process.extractOne(s, country_names, scorer=fuzz.token_sort_ratio, score_cutoff=88)
+        if match:
+            return country_map[match[0]]
+
+        if len(s) <= 5:
+            match_partial = process.extractOne(
+                s, country_names, scorer=fuzz.partial_token_sort_ratio, score_cutoff=90
+            )
+            if match_partial:
+                return country_map[match_partial[0]]
+
+        return None
 
     def _match_country(loc: str) -> str | None:
         if not loc:
             return None
 
-        if len(loc) == 2:
-            country = pycountry.countries.get(alpha_2=loc.upper())
-            if country:
-                return country.alpha_3.lower()
+        cleaned = _clean_location_string(loc)
 
-        if len(loc) == 3:
-            country = pycountry.countries.get(alpha_3=loc.upper())
-            if country:
-                return country.alpha_3.lower()
+        code = get_country_code(cleaned)
+        if code:
+            return code
 
-        try:
-            country = pycountry.countries.lookup(loc)
-            return country.alpha_3.lower()
-        except LookupError:
-            pass
+        separators = [",", "/", "-", "–", "&", " and ", " or ", ";", " in ", " at ", " near "]
+        parts: List[str] = [cleaned]
+        for sep in separators:
+            new_parts = []
+            for p in parts:
+                if sep in p:
+                    split = [sp.strip() for sp in p.split(sep) if sp.strip()]
+                    new_parts.extend(split)
+                else:
+                    new_parts.append(p)
+            parts = new_parts
 
-        country_names = [c.name.lower() for c in pycountry.countries]  # type: ignore
-        match = process.extractOne(
-            loc, country_names, scorer=fuzz.token_sort_ratio, score_cutoff=85
-        )
-        if match and match[1] >= 85:
-            matched_country = pycountry.countries.lookup(match[0])
-            return matched_country.alpha_3.lower()
+        parts = list(dict.fromkeys(p for p in parts if len(p) >= 2))
 
-        return loc if loc else None
+        for part in reversed(parts):
+            code = get_country_code(part)
+            if code:
+                return code
+
+        return cleaned if cleaned else None
 
     cleaned_locations = df["location"].apply(_clean_location_string)
     normalized = cleaned_locations.apply(_match_country)
