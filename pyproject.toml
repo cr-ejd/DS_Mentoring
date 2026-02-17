@@ -16,6 +16,7 @@ classifiers = [
     
 ]
 dependencies = [
+    "category-encoders>=2.9.0",
     "jupyter",
     "matplotlib",
     "numpy",
