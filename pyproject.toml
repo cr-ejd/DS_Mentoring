@@ -16,17 +16,20 @@ classifiers = [
     
 ]
 dependencies = [
-    "jupyter>=1.1.1",
-    "matplotlib>=3.10.8",
-    "numpy>=2.4.2",
-    "pandas>=3.0.0",
-    "pip",
+    "category-encoders>=2.9.0",
+    "jupyter",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pycountry",
+    "pyspellchecker",
     "pytest",
     "python-dotenv",
+    "rapidfuzz",
     "ruff",
-    "scikit-learn>=1.8.0",
-    "seaborn>=0.13.2",
-    "ydata-profiling==4.6.5",
+    "scikit-learn",
+    "seaborn",
+    "spacy",
 ]
 requires-python = "~=3.11.0"
 
