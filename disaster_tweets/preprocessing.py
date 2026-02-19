@@ -6,7 +6,7 @@ import html
 import re
 import urllib.parse
 from collections import Counter
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, Literal, Optional, Union
 
 import pandas as pd
 import pycountry
@@ -58,18 +58,7 @@ def correct_spelling(text: str) -> str:
 
 
 def normalize_locations(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize location strings to ISO alpha-3 country codes where possible.
-
-    Improved version:
-    - Prioritizes exact 2/3-letter country codes
-    - Higher fuzzy thresholds, especially for short strings
-    - partial matching only for very short strings and very high score
-    - Checks parts strictly from the end (country is usually last)
-    - Minimal aliases only for most common abbreviations
-    - Falls back to cleaned original string if no reliable country match
-
-    Returns alpha-3 code (lowercase) or cleaned original location.
-    """
+    """Normalize location strings to ISO alpha-3 country codes where possible."""
     df = df.copy()
     df["location"] = df["location"].fillna("").astype(str).str.lower().str.strip()
 
@@ -94,10 +83,8 @@ def normalize_locations(df: pd.DataFrame) -> pd.DataFrame:
         "u.s.": "usa",
         "u.k.": "gbr",
     }
-    for alias, code in minimal_aliases.items():
-        if alias not in country_map:
-            country_names.append(alias)
-            country_map[alias] = code
+    country_names.extend(minimal_aliases)
+    country_map.update(minimal_aliases)
 
     def _clean_location_string(loc: str) -> str:
         loc = re.sub(r"[^ \w,./-]", "", loc)
@@ -113,7 +100,6 @@ def normalize_locations(df: pd.DataFrame) -> pd.DataFrame:
             country = pycountry.countries.get(alpha_2=s.upper())
             if country:
                 return country.alpha_3.lower()
-
         if len(s) == 3:
             country = pycountry.countries.get(alpha_3=s.upper())
             if country:
@@ -135,40 +121,27 @@ def normalize_locations(df: pd.DataFrame) -> pd.DataFrame:
 
         return None
 
-    def _match_country(loc: str) -> str | None:
-        if not loc:
-            return None
+    df["cleaned_location"] = df["location"].apply(_clean_location_string)
 
-        cleaned = _clean_location_string(loc)
+    separators_pattern = r",|/|-|–|&|\band\b|\bor\b|;|\bin\b|\bat\b|\bnear\b"
+    df["parts"] = df["cleaned_location"].str.split(separators_pattern, expand=False)
+    df["parts"] = df["parts"].apply(
+        lambda x: [p.strip() for p in x if p.strip() and len(p.strip()) >= 2]
+    )
 
-        code = get_country_code(cleaned)
-        if code:
-            return code
+    df["last_part"] = df["parts"].apply(lambda x: x[-1] if x else "")
+    df["country_code"] = df["last_part"].apply(get_country_code)
 
-        separators = [",", "/", "-", "–", "&", " and ", " or ", ";", " in ", " at ", " near "]
-        parts: List[str] = [cleaned]
-        for sep in separators:
-            new_parts = []
-            for p in parts:
-                if sep in p:
-                    split = [sp.strip() for sp in p.split(sep) if sp.strip()]
-                    new_parts.extend(split)
-                else:
-                    new_parts.append(p)
-            parts = new_parts
+    mask_no_code = df["country_code"].isna()
+    df.loc[mask_no_code, "country_code"] = df.loc[mask_no_code, "cleaned_location"].apply(
+        get_country_code
+    )
 
-        parts = list(dict.fromkeys(p for p in parts if len(p) >= 2))
+    df["location_normalized"] = df["country_code"].combine_first(df["cleaned_location"])
 
-        for part in reversed(parts):
-            code = get_country_code(part)
-            if code:
-                return code
-
-        return cleaned if cleaned else None
-
-    cleaned_locations = df["location"].apply(_clean_location_string)
-    normalized = cleaned_locations.apply(_match_country)
-    df["location_normalized"] = normalized
+    df = df.drop(
+        columns=["cleaned_location", "parts", "last_part", "country_code"], errors="ignore"
+    )
 
     return df
 
@@ -221,49 +194,8 @@ def safe_text(text: Optional[str]) -> str:
     return str(text)
 
 
-def count_typos(text: Optional[str]) -> int:
-    """Count potential typos in text by checking unknown words (length >= 4).
-
-    Removes URLs, HTML, mentions, hashtags and punctuation before analysis.
-
-    Args:
-        text (Optional[str]): Input text.
-
-    Returns:
-        int: Number of unknown words (considered typos).
-    """
-    text = safe_text(text)
-    if not text:
-        return 0
-    text = urllib.parse.unquote(text)
-    text = html.unescape(text)
-    text = text.lower()
-    text = URL_PATTERN.sub("", text)
-    text = HTML_TAG_PATTERN.sub("", text)
-    text = MENTION_PATTERN.sub("", text)
-    text = HASHTAG_PATTERN.sub(r"\1", text)
-    text = PUNCT_PATTERN.sub("", text)
-    words = re.findall(r"\b[a-z]{4,}\b", text)
-    real_typos = sum(1 for w in words if spell.unknown([w]))
-    return real_typos
-
-
-def full_preprocess(text: Optional[str]) -> str:
-    """Fully preprocess tweet text: clean, lemmatize and optionally correct spelling.
-
-    Steps:
-        - Decode URL encoding and HTML entities
-        - Remove HTML tags, URLs, mentions, hashtags symbols, punctuation
-        - Lowercase and normalize whitespace
-        - Lemmatize using spaCy (remove stop words and punctuation)
-        - (Spelling correction is currently disabled)
-
-    Args:
-        text (Optional[str]): Raw tweet text.
-
-    Returns:
-        str: Cleaned and lemmatized text.
-    """
+def clean_raw_text(text: Optional[str]) -> str:
+    """Common text cleaning: decode, remove tags/URLs/mentions/hashtags/punct/numbers."""
     text = safe_text(text)
     if not text:
         return ""
@@ -277,6 +209,23 @@ def full_preprocess(text: Optional[str]) -> str:
     text = HTTP_CODE_PATTERN.sub("", text)
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def count_typos(text: Optional[str]) -> int:
+    """Count potential typos in text by checking unknown words (length >= 4)."""
+    text = clean_raw_text(text)
+    if not text:
+        return 0
+    words = re.findall(r"\b[a-z]{4,}\b", text)
+    return sum(1 for w in words if spell.unknown([w]))
+
+
+def full_preprocess(text: Optional[str]) -> str:
+    """Fully preprocess tweet text: clean, lemmatize and optionally correct spelling."""
+    text = clean_raw_text(text)
+    if not text:
+        return ""
 
     doc = nlp(text)
     lemmatized = [

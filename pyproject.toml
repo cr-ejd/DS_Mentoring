@@ -19,6 +19,7 @@ dependencies = [
     "category-encoders>=2.9.0",
     "jupyter",
     "matplotlib",
+    "mlflow>=3.9.0",
     "numpy",
     "pandas",
     "pycountry",
