@@ -1,6 +1,15 @@
 # Data
 /data/
 
+# Kaggle submissions and MLflow
+submissions/
+mlflow.db
+mlartifacts/
+mlruns/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
 # Mac OS-specific storage files
 .DS_Store
 

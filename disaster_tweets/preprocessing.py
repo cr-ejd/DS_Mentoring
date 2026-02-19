@@ -65,19 +65,23 @@ def normalize_locations(df: pd.DataFrame) -> pd.DataFrame:
     country_names = []
     country_map: Dict[str, str] = {}
     for c in pycountry.countries:
-        code = c.alpha_3.lower() # type: ignore
+        code = c.alpha_3.lower()  # type: ignore
         if hasattr(c, "name"):
-            n = c.name.lower() # type: ignore
+            n = c.name.lower()  # type: ignore
             country_names.append(n)
             country_map[n] = code
-        if hasattr(c, "official_name") and c.official_name: # type: ignore
-            o = c.official_name.lower() # type: ignore
+        if hasattr(c, "official_name") and c.official_name:  # type: ignore
+            o = c.official_name.lower()  # type: ignore
             if o not in country_map:
                 country_names.append(o)
                 country_map[o] = code
 
     minimal_aliases = {
-        "uk": "gbr", "gb": "gbr", "us": "usa", "u.s.": "usa", "u.k.": "gbr",
+        "uk": "gbr",
+        "gb": "gbr",
+        "us": "usa",
+        "u.s.": "usa",
+        "u.k.": "gbr",
     }
     country_names.extend(minimal_aliases)
     country_map.update(minimal_aliases)
@@ -109,7 +113,9 @@ def normalize_locations(df: pd.DataFrame) -> pd.DataFrame:
             return country_map[match[0]]
 
         if len(s) <= 5:
-            match_partial = process.extractOne(s, country_names, scorer=fuzz.partial_token_sort_ratio, score_cutoff=90)
+            match_partial = process.extractOne(
+                s, country_names, scorer=fuzz.partial_token_sort_ratio, score_cutoff=90
+            )
             if match_partial:
                 return country_map[match_partial[0]]
 
@@ -119,17 +125,23 @@ def normalize_locations(df: pd.DataFrame) -> pd.DataFrame:
 
     separators_pattern = r",|/|-|–|&|\band\b|\bor\b|;|\bin\b|\bat\b|\bnear\b"
     df["parts"] = df["cleaned_location"].str.split(separators_pattern, expand=False)
-    df["parts"] = df["parts"].apply(lambda x: [p.strip() for p in x if p.strip() and len(p.strip()) >= 2])
+    df["parts"] = df["parts"].apply(
+        lambda x: [p.strip() for p in x if p.strip() and len(p.strip()) >= 2]
+    )
 
     df["last_part"] = df["parts"].apply(lambda x: x[-1] if x else "")
     df["country_code"] = df["last_part"].apply(get_country_code)
 
     mask_no_code = df["country_code"].isna()
-    df.loc[mask_no_code, "country_code"] = df.loc[mask_no_code, "cleaned_location"].apply(get_country_code)
+    df.loc[mask_no_code, "country_code"] = df.loc[mask_no_code, "cleaned_location"].apply(
+        get_country_code
+    )
 
     df["location_normalized"] = df["country_code"].combine_first(df["cleaned_location"])
 
-    df = df.drop(columns=["cleaned_location", "parts", "last_part", "country_code"], errors="ignore")
+    df = df.drop(
+        columns=["cleaned_location", "parts", "last_part", "country_code"], errors="ignore"
+    )
 
     return df
 
@@ -181,6 +193,7 @@ def safe_text(text: Optional[str]) -> str:
         return ""
     return str(text)
 
+
 def clean_raw_text(text: Optional[str]) -> str:
     """Common text cleaning: decode, remove tags/URLs/mentions/hashtags/punct/numbers."""
     text = safe_text(text)
@@ -201,15 +214,16 @@ def clean_raw_text(text: Optional[str]) -> str:
 
 def count_typos(text: Optional[str]) -> int:
     """Count potential typos in text by checking unknown words (length >= 4)."""
-    text = clean_raw_text(text)  
+    text = clean_raw_text(text)
     if not text:
         return 0
     words = re.findall(r"\b[a-z]{4,}\b", text)
     return sum(1 for w in words if spell.unknown([w]))
 
+
 def full_preprocess(text: Optional[str]) -> str:
     """Fully preprocess tweet text: clean, lemmatize and optionally correct spelling."""
-    text = clean_raw_text(text)  
+    text = clean_raw_text(text)
     if not text:
         return ""
 
@@ -226,6 +240,7 @@ def full_preprocess(text: Optional[str]) -> str:
     # return corrected_text
 
     return lemmatized_text
+
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """Apply full feature extraction pipeline to a DataFrame of tweets.
